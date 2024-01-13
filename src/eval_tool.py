@@ -634,7 +634,9 @@ class Evaluator:
                             }).set_index('csno'))
 
             # metric update
-            self.accuracy
+            self.accuracy.update(batch_n_inters)
+            self.bleu.update(batch_BLEUs)
+            self.rouge.update(batch_ROUGEs)
 
 
 
