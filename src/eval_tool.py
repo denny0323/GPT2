@@ -602,7 +602,8 @@ class Evaluator:
                 batch_y_gen = []
                 batch_y_gen_true = []
 
-                for csno, y_gen_topk, y_gen_topk_prob, y_true in zip(csnos, generated_word_batch, generated_word_prob_batch, batch.Y_txt):
+                for csno, y_gen_topk, y_gen_topk_prob, y_true in zip(csnos, generated_word_batch,\
+                                                                     generated_word_prob_batch, batch.Y_txt):
                     y_gen_topk_txt = list(map(lambda x: ' '.join(x), y_gen_topk))
 
                     y_gen_topk_prob = [
@@ -613,7 +614,8 @@ class Evaluator:
                     ]
 
                     # compute metrics by the current batch
-                    n_inters, BLEU, ROUGE, X_correction, Y_correction = self.check_similarity_ROUGE_BLEU(y_gen_topk_txt, y_true)
+                    n_inters, BLEU, ROUGE, X_correction, Y_correction = self.check_similarity_ROUGE_BLEU(y_gen_topk_txt,
+                                                                                                         y_true)
 
                     batch_n_inters.append(n_inters)
                     batch_BLEUs.append(BLEU)
@@ -621,22 +623,100 @@ class Evaluator:
                     batch_y_gen.append(X_correction)
                     batch_y_gen_true.append(Y_correction)
 
-                        # log print
-                        if print_switch:
-                            display(pd.DataFrame({
-                                'csno': [csno] + ['']*(len(y_gen_topk)-1),
-                                'y_gen': X_correction,
-                                'y_gen_beam_prob': y_gen_topk_prob,
-                                'n_inter': list(map(lambda x: round(x, 3), n_inters)),
-                                'bleu': list(map(lambda x: round(x, 3), BLEU)),
-                                'rouge': list(map(lambda x: round(x, 3), ROUGE)),
-                                'y_true': [Y_correction] + ['']*(len(y_gen_topk)-1),
-                            }).set_index('csno'))
+                    # # log print
+                    # if print_switch:
+                    #     display(pd.DataFrame({
+                    #         'csno': [csno] + ['']*(len(y_gen_topk)-1),
+                    #         'y_gen': X_correction,
+                    #         'y_gen_beam_prob': y_gen_topk_prob,
+                    #         'n_inter': list(map(lambda x: round(x, 3), n_inters)),
+                    #         'bleu': list(map(lambda x: round(x, 3), BLEU)),
+                    #         'rouge': list(map(lambda x: round(x, 3), ROUGE)),
+                    #         'y_true': [Y_correction] + ['']*(len(y_gen_topk)-1),
+                    #     }).set_index('csno'))
 
             # metric update
             self.accuracy.update(batch_n_inters)
             self.bleu.update(batch_BLEUs)
             self.rouge.update(batch_ROUGEs)
+
+            if print_switch:
+                print(f"{(i//batch_size)+1}/{steps}] | Process {rank} \
+                | Top {top_k} n_inters : {self.accuracy.compute_average():>.4f} \
+                | Top_{top_k} BLEU : {self.bleu.compute_average():>.4f} \
+                | Top_{top_k} ROUGE : {self.rouge.compute_average():>.4f}")
+
+
+            del generated_word_batch, generated_word_prob_batch
+            torch.cuda.empty_cache()
+            gc.collect()
+
+
+
+            # 1. 필요한 컬럼들
+            #   1-1. sequence_generation 평가 -> csno, pred_seq_mrch, pred_seq_mrch_prob, scores
+            #   1-2. vs BERT 평가 -> csno, pred_label_mccb, y_label, metrics -> 적재?
+            # 2. Time stamp? -> log로 돌리기
+            # 3. 계산할 것들 -> 중간중간 print? (hive table? or local csv file)
+
+            vsBERT_batch_output_df = pd.DataFrame({
+                'csno' : csnos,
+                'y_pred_ml' : y_pred_ml.tolist(),
+                'y_pred_txt': batch_y_gen,
+                'y_true_ml' : y_true_ml.tolist(),
+                'y_true_txt': batch_y_gen_true
+            })
+            vsBERT_batch_output_df['part_dt'] = self.today
+
+            torch.cuda.empty_cache()
+            gc.collect()
+
+            ### 결과 저장 (1) hive table 적재
+            if self.save_type == 'hive':
+                with Hyspark(**self.hyspark_param) as hs:
+                    sai_packer.register(hs)
+                    hc, sc, ss = hs.hive_context, hs.spark_context, hs.spark_session
+                    check_hive_available(hc)
+
+                    output_pyspark_df_schema = StructType([
+                        StructField("csno", StringType()),
+                        StructField("y_pred_ml", ArrayType(IntegerType()),
+                        StructField("y_pred_txt", ArrayType(StringType()),
+                        StructField("y_true_ml", ArrayType(IntegerType()),
+                        StructField("y_true_txt", ArrayType(StringType()),
+                        StructField("part_dt", StringType())
+                    ])
+
+                    vsBERT_batch_output_pyspark_df = ss.createDataFrame(vsBERT_batch_output_df, output_pyspark_df_schema)
+                    vsBERT_batch_output_pyspark_df.write.saveAsTable('hivedb.table_name',
+                                                                     mode='append', partitionBy='part_dt')
+                del vsBERT_batch_output_pyspark_df
+
+
+
+            ### 결과 저장 (2) csv file 저장
+            else:
+                vsBERT_batch_output_df.to_csv('file_name.csv'
+                                              sep='\t',
+                                              encoding='utf-8',
+                                              index=False,
+                                              mode='a',
+                                              header=useHeader)
+                useHeader = False
+
+            del batch, csnos, ys, y_txt
+            del vsBERT_batch_output_df
+            torch.cuda.empty_cache()
+            gc.collect()
+
+
+        del metrics_per_class
+
+
+
+
+
+
 
 
 
