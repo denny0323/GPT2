@@ -554,6 +554,33 @@ class Evaluator:
                 batched_pred_topk = list(map(self.word_to_label, generated_word_batch))
 
 
+                # multi-label화 --- BERT와 비교하기 위해
+                y_pred_ml = self.MultiLabelBinarizer(self.uniq_list(batched_pred_topk))
+                y_true_ml = self.MultiLabelBinarizer(batch.Y.to_list(), is_y_true=True)
+                del batched_pred_topk
+                torch.cuda.empty_cache()
+
+
+                # update metric dict
+                for c in range(10):
+                    report = classification_report(y_true_ml[:, c], y_pred_ml[:, c],
+                                                   labels=[0, 1], digits=4, output_dict=True,
+                                                   zero_division=0)
+
+                    metrics_per_class[c][0].update([report['l']['precision']])
+                    metrics_per_class[c][1].update([report['l']['recall']])
+                    metrics_per_class[c][2].update([accuracy_score(y_true_ml[:, c], y_pred_ml[:, c])]) # pred, label이 모두 0일 경우 report에 안뜸
+                    metrics_per_class[c][3].update([report['l']['f1-score']])
+
+
+                # for display
+                metrics_per_class_for_print = {
+                    k: map(lambda x: self.averager(x), v) for k, v in metrics_per_class.item()
+                }
+
+
+
+
 
 
 
