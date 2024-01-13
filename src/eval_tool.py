@@ -4,9 +4,8 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 
-import warning
+import warnings
 warnings.filterwarnings('ignore')
-
 
 import logging
 logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR) # evaluation시 error meassage만 출력
@@ -19,7 +18,7 @@ sys.path.append('../{file_script_path2}')
 from datetime import datetime
 from hyspark import Hyspark # spark custom ver. file
 from spark_hive_table_utils import check_hive_available, df_as_pandas_with_pyspark # custom spark utils file
-from IPython.display import display
+#from IPython.core.display import display
 
 from test_utils import modified_precision # my utils
 from typing import List, Tuple, Union, Optional
