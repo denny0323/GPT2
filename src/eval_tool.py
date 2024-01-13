@@ -533,8 +533,10 @@ class Evaluator:
                 gc.collect()
                 ## 분기 시점
 
-
+                ###########################################
                 ###### track (1) : evaluation metric ######
+                ###########################################
+
                 # word -> 업종 label로 바꾸기
                 # 단위 : 개별 sample
                 for generated_words in generated_word_batch:
@@ -578,7 +580,61 @@ class Evaluator:
                     k: map(lambda x: self.averager(x), v) for k, v in metrics_per_class.item()
                 }
 
+                metric_df = pd.DataFrame(metrics_per_class_for_print)
+                metric_df.columns = ['class_'+str(c) for c in metric_df.columns]
+                metric_df.index = ['Precision', 'Recall', 'Accuracy', 'F1_score']
 
+
+                ###########################################
+                ##### track (2) : text generation 측정 #####
+                ###########################################
+
+                # 단위 : 개별 sample
+                if ((i // batch_size) % log_interval) == 0:
+                    print_switch = True
+                else:
+                    print_switch = False
+
+
+                batch_n_inters = []
+                batch_BLEUs = []
+                batch_ROUGEs = []
+                batch_y_gen = []
+                batch_y_gen_true = []
+
+                for csno, y_gen_topk, y_gen_topk_prob, y_true in zip(csnos, generated_word_batch, generated_word_prob_batch, batch.Y_txt):
+                    y_gen_topk_txt = list(map(lambda x: ' '.join(x), y_gen_topk))
+
+                    y_gen_topk_prob = [
+                        list(
+                            map(lambda x: np.round(x.numpy(), 4), topk_p_word)
+                        )
+                        for topk_p_word in y_gen_topk_prob
+                    ]
+
+                    # compute metrics by the current batch
+                    n_inters, BLEU, ROUGE, X_correction, Y_correction = self.check_similarity_ROUGE_BLEU(y_gen_topk_txt, y_true)
+
+                    batch_n_inters.append(n_inters)
+                    batch_BLEUs.append(BLEU)
+                    batch_ROUGEs.append(ROUGE)
+                    batch_y_gen.append(X_correction)
+                    batch_y_gen_true.append(Y_correction)
+
+                        # log print
+                        if print_switch:
+                            display(pd.DataFrame({
+                                'csno': [csno] + ['']*(len(y_gen_topk)-1),
+                                'y_gen': X_correction,
+                                'y_gen_beam_prob': y_gen_topk_prob,
+                                'n_inter': list(map(lambda x: round(x, 3), n_inters)),
+                                'bleu': list(map(lambda x: round(x, 3), BLEU)),
+                                'rouge': list(map(lambda x: round(x, 3), ROUGE)),
+                                'y_true': [Y_correction] + ['']*(len(y_gen_topk)-1),
+                            }).set_index('csno'))
+
+            # metric update
+            self.accuracy
 
 
 
