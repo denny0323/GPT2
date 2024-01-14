@@ -32,7 +32,7 @@ from collections import defaultdict
 gc_threshold = tuple(np.asarray(gc.get_threshold())*0.8)
 gc.set_threshold(*tuple(map(int, gc_threshold)))
 
-from packer import sai_packer
+from packer import Packer
 from pyspark.sql.types import *
 from tqdm import tqdm
 
@@ -673,7 +673,7 @@ class Evaluator:
             ### 결과 저장 (1) hive table 적재
             if self.save_type == 'hive':
                 with Hyspark(**self.hyspark_param) as hs:
-                    sai_packer.register(hs)
+                    Packer.register(hs)
                     hc, sc, ss = hs.hive_context, hs.spark_context, hs.spark_session
                     check_hive_available(hc)
 
