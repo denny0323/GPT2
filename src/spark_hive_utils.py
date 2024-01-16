@@ -136,5 +136,85 @@ def create_spark_session(app_name=None, mem_per_core=2, verbose=False,
   finally:
     hs.stop()   # 어떤 경우에도 반드시 자원 반환이 실행되어야 함(Error시에도)
               
+# 현 Spark 환경에서 Total Executor Core의 갯수를 return
+# Total Executor Core의 갯수가 Parallelism의 동시 Task 실행 수를 결정함
+# (즉, 한번에 동시에 실행되는 Task의 개수라고 생각할 수 있음)
+def get_total_num_executor_cores(spark_context):
+  n_instances = get_spark_conf(spark_context, 'spark.executor.instances')
+  n_cores_per_executor = get_spark_conf(spark_context, 'spark.executor.cores')
+  return int(n_instances) * int(n_cores_per_executor)
 
-      
+# Spark Context환경설정 Literal(conf_str)에 대한 설정값을 str로 리턴
+# (예: get_conf(sc, 'spark.driver.memory')는 해당 설정값을 문자열로 리턴함
+def get_spark_conf(spark_context, conf_str):
+  return spark_context._conf.get(conf_str)
+
+# Spark SQLContext관련 설정값을 리턴
+# 예를 들어, 'spark.sql.shffle.partitions', 'spark.sql.files.maxPartitionBytes' 등의
+# 환경설정명에 대한 값을 얻어올 수 있음 (위 함수와 혼동 주의)
+def get_sql_conf(hive_context, conf_str):
+  return hive_context.getConf(conf_str)
+
+# Spark SQLContext관련 설정값을 바꿈
+# 예를 들어, 'spark.sql.shffle.partitions', 'spark.sql.files.maxPartitionBytes' 등의
+# 환경설정을 바꿀 수 있음
+def set_sql_conf(hive_context, conf_str, value):
+  return hive_context.setConf(conf_str, value)
+
+
+
+# 'spark.sql.shuffle.partitions' 속성의 설정값을 최적화하는 함수
+''' 
+속성 : Configures the number of partitions to use
+           when shuffling data for joins or aggregations. (Default 200)) 
+Description : Hyspark에서 기본 Driver를 사용하면 이 때는 Total Executor Cores 수가 
+              65로 잡히므로 적절하지만 Orge Driver 등을 사용하면 165까지도 잡히기 때문에,
+              이 값을 적절히 2~4배 정도로 불려줄 때, 데이터의 Join 및 Attribute의 병렬 연산에
+              더 도움이 될 것. 그대로 200일 경우 200개의 Task 중 165개가 Assign되어 돌아간 후
+              나머지 35개가 돌아갈 것. 만약 330으로 2배 개수로 잡았다면, 시간이 더 절약됨
+'''
+# Spark session을 잡은 후, 바로 다음에 실행하면, 이후 작업들이 이 설정 기준으로 실행됨
+def optimize_shuffle_partitions(hive_context, spark_context, multiplier=3, 
+                                verbose=False):
+  property_str = 'spark.sql.shuffle.partitions'
+  n_cores = get_total_num_executor_cores(spark_context)
+  new_val = n_cores * multiplier
+
+  if verbose:
+    prev_val = int(get_seq_conf(hive_context, property_str))
+    print("Current Value of '%s': '%d' -> Change to %d" %
+          (property_str, prev_val, new_val))
+
+  return set_sql_conf(hive_context, property_str, new_val)
+
+
+
+# 'spark.sql.shuffle.partitions'속성의 설정값을 바꾸는 함수 (의미는 위 함수 참조)
+def change_shuffle_partitions(hive_context, num_shuffle_partitions):
+  return set_sql_conf(hive_context, 'spark.sql.shuffle.partitions',
+                      num_shuffle_partitions)
+
+# Pandas DataFrame의 Memory 사용량을 MegaBytes로 리턴
+def get_mem_usage_in_megabytes(pandas_df):
+  return float(sum(pandas_df.memory_usage())) / 1024 / 1024
+
+
+# sql_as_pandas_w_pyspark, df_as_pandas_with_pyspark에서 사용되는 함수
+# cast dict에 대한 Validation 및 처리
+def _check_cast_dict(cast_dict):
+  if cast_dict is None:
+    return {}
+    
+  if not isinstance(cast_dict, dict):
+    raise ValueError('cast_dict must be a dict.')
+
+  # 지원되는 Cast String은 Pyspark 2.4.0 기준을 따름 ('short' 추가)
+  supported_cast_strings = ('int', 'tinyint', 'smallint', 'short', 'biging',
+                            'boolean', 'float', 'double', 'string')
+  diff = set(cast_dict.values()) - set(supported_cast_strings)
+  if len(diff) > 0:
+    raise ValueError("cast_dict contains unsupported values: %s. "
+                     "Supported values are %s. " %
+                     (diff, supported_cast_strings))
+  return cast_dict
+
