@@ -17,7 +17,7 @@ sys.path.append('../{file_script_path2}')
 
 from datetime import datetime
 from hyspark import Hyspark # spark custom ver. file
-from spark_hive_table_utils import check_hive_available, df_as_pandas_with_pyspark # custom spark utils file
+from spark_hive_utils import check_hive_available, df_as_pandas_with_pyspark # custom spark utils file
 #from IPython.core.display import display
 
 from test_utils import modified_precision # my utils
