@@ -34,8 +34,6 @@ def elapsed_time(format_string='Elapsed time: %f seconds', verbose=True):
     print(format_string % elapsed_time)
 
 
-
-
 # Pyspark에서 Hive로 데이터 접근이 가능 지 체크하는 함수
 '''
 Parameters:
@@ -265,3 +263,28 @@ def _get_cast_expr(pyspark_df, convert_decimal, cast_dict,
 
   # cast_info_list가 비어 있으면 Type Casting 없음의 의미로 빈 리스트 return
   return [] if num_cast == 0 else cast_str_list
+
+def sql_as_pandas_with_pyspark(sql, hive_context=None,
+                               convert_decimal=True, cast_dict=None,
+                               delete_temp_hdfs=True, delete_temp_local=True,
+                               verbose=False, verbose_cast=20, issue_warn=True,
+                               temp_filename=None, load_data=True,
+                               use_regex=False, numeric_to_float=False,
+                               double_to_float=False, bigint_to_int=False,
+                               num_shuffle_partitions=None, num_threads=None,
+                               instance_option=None, **kwargs):
+  
+  # Hyspark에서의 제공가능 instance값
+  supported_instance_options = ['mini', 'general', 'full']
+  if instance_option is None:
+    instance_option = 'mini'
+  if instance_option not in supported_instance_options:
+    raise ValueError("The instance_option='%s' is not supported. "
+                     "Supported values are %s." %
+                     (instance_option, supported_instance_options))
+
+  positional_args = [convert_decimal, cast_dict, delete_temp_hdfs,
+                     delete_temp_local, verbose, verbose_cast, issue_warn,
+                     temp_filename, load_data, numeric_to_float,
+                     double_to_float, bigint_to_int, num_threads]
+                                   
