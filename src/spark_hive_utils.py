@@ -287,4 +287,32 @@ def sql_as_pandas_with_pyspark(sql, hive_context=None,
                      delete_temp_local, verbose, verbose_cast, issue_warn,
                      temp_filename, load_data, numeric_to_float,
                      double_to_float, bigint_to_int, num_threads]
-                                   
+
+  # sql이 string이면 list로 감싸줌
+  if isinstance(sql, string_types):
+    sql = [sql]
+
+  # hive_context가 없을 경우, Pyspark 접속 후 데이터 불러옴
+  if hive_context is None:
+    with create_spark_session(verbose=verbose,
+                              instance=instance_option) as hs:
+      if use_regex:
+        hs.hive_context.setConf('spark.sql.parser.quotedRegexColumnNames', 'true')
+      if num_shuffle_partitions is not None:
+        change_shuffle_partitions(hs.hive_context,
+                                  num_shuffle_partitons)
+      res = [df_as_pandas_with_pyspark(hs.hive_context.sql(ql),
+                                       *positional_args, **kwargs)
+             for ql in sql]
+      return res[0] if len(res) == 1 else res
+
+
+  # hive_context가 있을 경우, 그대로 실행
+  if use_regex:
+    hive_context.setConf('spark.sql.parser.quotedRegexColumnNames', 'true')
+  res = [df_as_pandas_with_pyspark(hs.hive_context.sql(ql),
+                                   *positional_args, **kwargs)
+         for ql in sql]
+  return res[0] if len(res) == 1 else res 
+                              
+                                
