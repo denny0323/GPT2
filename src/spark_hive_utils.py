@@ -218,3 +218,50 @@ def _check_cast_dict(cast_dict):
                      (diff, supported_cast_strings))
   return cast_dict
 
+
+# sql_as_pandas_with_pyspark, df_as_pandas_with_pyspark에서 사용되는 함수
+# Pyspark DataFrame에 대해, convert_decimal, cast_dict에 따른 type conversion logic이 적용된
+# String Expression을 리턴하는 함수 (selectExpr에 사용됨)
+def _get_cast_expr(pyspark_df, convert_decimal, cast_dict,
+                   numeric_to_float, double_to_float, bigint_in_int,
+                   verbose=False, verbose_cast=20):
+  cast_str_list = []
+  cast_info_list = []
+  cast_template = 'CAST(%s AS %s) AS %s'
+
+  default_real = 'float' if double_to_float else 'double'
+  default_int = 'int' if bigint_to_int else 'bigint'
+
+  for s in pyspark_df.schema:
+    dtype = s.dataType
+    dname = dtype.typeName()
+
+    # cast_dict에 casting 규칙이 있으면 이를 우선함
+    # casting 규칙이 없는데 convert_decimal=True인 경우에는 실수부의 유무로 판별
+    if s.name in cast_dict:
+      type_str = cast_dict[s.name]
+    elif numeric_to_float and isinstance(dtype, NumericType):
+      type_str = 'float'
+    elif convert_decimal and dname.startswith('decimal'):
+      type_str = default_int if dtype.scale == 0 else default_real
+    elif double_to_float and dname == 'double':
+      type_str = default_real
+    elif bigint_to_int and dname == 'bigint':
+      type_str = default_int
+    else:
+      cast_str_list.append(s.name)
+      continue
+
+    cast_str_list.append(cast_template %(s.name, type_str, s.name))
+    cast_info_list.append('%s AS %s' %(s.name, type_str))
+
+  num_cast = len(cast_info_list)
+  if verbose and num_cast > 0:
+    if verbose_cast > 0 and verbose_cast < num_cast:
+      cast_info_str = ', '.join(cast_info_list[:verbose]) + ' ...'
+    else:
+      cast_info_str = ', '.join(cast_info_list)
+    print('Type Conversion (%d Columns): %s' %(num_cast, cast_info_str))
+
+  # cast_info_list가 비어 있으면 Type Casting 없음의 의미로 빈 리스트 return
+  return [] if num_cast == 0 else cast_str_list
