@@ -1,3 +1,15 @@
+'''
+  Pyspark로 Hive 데이터를 읽어오고, 업로드하는 용도의 함수들 모음
+
+  requirements:
+    HySpark : 사내 spark
+    PyArrow
+
+  Author: B.H Oh
+'''
+
+
+
 from hyspark import Hyspark # Spark TF에서 만든 사내 spark.
 from contextlib import contextmanager, redirect_stdout
 from pyarrow import cpu_count, set_cpu_count
@@ -32,6 +44,32 @@ def elapsed_time(format_string='Elapsed time: %f seconds', verbose=True):
   elapsed_time = perf_counter() - start_time
   if verbose:
     print(format_string % elapsed_time)
+
+
+# seconds 시간 동안 실행이 끝나지 않으면 TimeoutException을 발생
+@contextmanager
+def time_limit(seconds, msg='Timed out!'):
+  class TimeoutException(Exception): pass
+
+  def _signal_handler(signum, frame):
+    raise TimeoutException(msg)
+
+  signal.signal(signal.SIGALRM, _signal_handler)
+  signal.alarm(seconds)
+
+  try:
+    yield
+  finally:
+    signal.alarm(0)
+
+# 사용 Thread수를 제한하여 PyArrow함수가 돌도록하는 함수
+'''
+Description:
+  PyArrow 내장 함수들은 기본적으로 CPU 개수만큼 Multithreading을 사용하여 동작한다.
+'''
+
+
+
 
 
 # Pyspark에서 Hive로 데이터 접근이 가능 지 체크하는 함수
