@@ -65,9 +65,24 @@ def time_limit(seconds, msg='Timed out!'):
 # 사용 Thread수를 제한하여 PyArrow함수가 돌도록하는 함수
 '''
 Description:
-  PyArrow 내장 함수들은 기본적으로 CPU 개수만큼 Multithreading을 사용하여 동작한다.
-'''
+  PyArrow 내장 함수들은 기본적으로 CPU 개수만큼 Multithreading을 사용하여 동작함.
+  만약 이 Context Manager를 사용하면 with문 안에서는 count 개수만큼의 CPU만 사용할 수 있음
+  (작업 종료 후에는 현재의 CPU Count를 다시 복원시킴)
 
+Example:
+  .parguet파일을 읽을 떄 10개의 CPU만 사용하게 하는 방법임
+  (pandas.read_parquet함수는 기본적으로 PyArrow Engine을 사용하여 파일을 읽음)
+
+  with pyarrow_cpu_count(10):
+    pd.read_parquet(file)
+'''
+@contextmanager
+def pyarrow_cpu_count(count):
+  current_cpu_count = cpu_count()
+  if count >= 1:
+    set_cpu_count(count)
+  yield
+  set_cpu_count(current_cpu_count)
 
 
 
