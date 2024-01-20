@@ -12,7 +12,7 @@ import sys
 sys.path.append('../utils')
 
 import config
-from utils import *
+from run_utils import *
 
 from transformers import BertTokenizer # WordPiece tokenizer사용
 from transformers import TrainingArguments
