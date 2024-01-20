@@ -42,6 +42,15 @@ def modified_precision(candidate, reference_list, n=1):
 
 
 def sentence_modified_precision(candidate_list, reference):
-  return [modified_precision(candidate, [reference]) for candidate in candidate_list]
+  return [modified_precision(candidate, [reference]) 
+          for candidate in candidate_list]
+
+    
+
+        
+
+
+
+
 
 
