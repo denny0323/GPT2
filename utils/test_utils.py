@@ -3,7 +3,9 @@ from collections import Counter
 from nltk import ngrams
 
 def simple_count(tokens, n):
-  return Counter (ngrams(tokens, n))
+  return Counter(ngrams(tokens, n))
+
+
 
 def count_clip(candidate, reference_list, n=1):
   # Ca 문장에서 n-gram 카운트
@@ -26,6 +28,8 @@ def count_clip(candidate, reference_list, n=1):
         n_gram: min(ca_cnt.get(n_gram, 0), max_ref_cnt_dict.get(n_gram, 0)) for n_gram in ca_cnt
      }
 
+
+
 def modified_precision(candidate, reference_list, n=1):
   clip_cnt = count_clip(candidate, reference_list, n) 
   total_clip_cnt = sum(clip_cnt.values()) # 분자
@@ -41,9 +45,9 @@ def modified_precision(candidate, reference_list, n=1):
   return (total_clip_cnt / total_cnt)
 
 
+
 def sentence_modified_precision(candidate_list, reference):
-  return [modified_precision(candidate, [reference]) 
-          for candidate in candidate_list]
+  return [modified_precision(candidate, [reference]) for candidate in candidate_list]
 
     
 
