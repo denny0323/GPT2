@@ -41,8 +41,6 @@ tokenizer.decoder = ByteLevelDecoder()
 tokenizer.post_processor = ByteLevelProcessor(trim_offsets=False)
 tokenizer.normalizer = NFKC()
 
-trainer = BpeTrainer()
-
 tokenizer.train_from_iterator(iter(df), vocab_size=int(1.1e5),
                               show_progress=False, special_tokens=["<|endoftext|>", "<|padding|>"])
 
